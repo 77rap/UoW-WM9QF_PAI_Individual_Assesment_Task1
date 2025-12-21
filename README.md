@@ -1,6 +1,6 @@
 # Public Health Data Insights Dashboard
 
-Desktop app for working with public health datasets. Import CSV files or pull data from the WHO API, then clean, filter, sort, and visualize the data. Everything is stored in SQLite so your imports persist between sessions.
+A desktop application for exploring and analyzing public health datasets. Import data from CSV files or the WHO Global Health Observatory (GHO) API, then clean, filter, sort, and visualize your data. All imports are persisted in a local SQLite database.
 
 Built with Python, Tkinter, pandas, and matplotlib.
 
@@ -11,56 +11,109 @@ pip install pandas matplotlib requests pillow
 python main.py
 ```
 
-## What it does
+## Features
 
-**Import data** from CSV files or the WHO GHO API. The app stores everything in a local SQLite database so you can come back to your datasets later.
+### Data Import
+- **CSV Import**: Load local CSV files with automatic column type detection
+- **WHO API Integration**: Fetch live data from the World Health Organization's GHO API by indicator code (e.g., life expectancy, neonatal mortality)
 
-**Clean your data** by removing rows with missing values. You can specify which columns to check and what counts as "missing" (N/A, Unknown, blanks, etc.).
+### Data Management
+- **Persistent Storage**: All imported datasets are stored in SQLite and available across sessions
+- **View Logs**: Access detailed operation logs to track all actions performed on your data
 
-**Filter** by text values (pick from a list), numeric ranges (there's a nice dual-handle slider), or date ranges.
+### Data Cleaning
+- **Remove Missing Values**: Clean rows with missing data in selected columns
+- **Customizable Missing Indicators**: Configure what counts as "missing" (N/A, Unknown, blanks, NULL, etc.)
 
-**Sort** by clicking column headers or using the sort dialog.
+### Filtering
+- **Text Filters**: Select specific values from a list of unique entries
+- **Numeric Filters**: Use dual-handle range sliders for precise numeric filtering
+- **Date Filters**: Filter by date ranges with calendar-style selection
 
-**Analyze** with summary statistics - for numeric columns you get mean, median, std dev, etc. For text columns you get mode (most common value), frequency counts, and top 5 values.
+### Sorting
+- **Column Header Sorting**: Click any column header to sort ascending/descending
+- **Multi-Column Sorting**: Apply complex sort orders through the sort dialog
 
-**Graph** your data with line or bar charts. You can plot multiple Y columns on the same chart and aggregate by sum, mean, or count.
+### Analysis
+- **Summary Statistics**: 
+  - Numeric columns: count, mean, median, std dev, min, max, quartiles
+  - Text columns: mode, frequency counts, top 5 values
+- **Aggregations**: Sum, mean, and count operations
 
-All operations are non-destructive - the original data stays untouched and you can remove operations at any time.
+### Visualization
+- **Chart Types**: Line charts and bar charts
+- **Multi-Series Support**: Plot multiple Y columns on the same chart
+- **Export**: Save charts as PNG images
 
-## Project layout
+### Non-Destructive Operations
+All filter, sort, and clean operations are applied as a pipeline. Original data remains untouched, and any operation can be removed at any time.
+
+## Project Structure
 
 ```
-├── main.py              # run this
+├── main.py                  # Application entry point
 ├── src/
-│   ├── config.py        # settings and constants
-│   ├── presentation.py  # all the GUI code
-│   ├── data/            # database stuff, CSV/API adapters
-│   └── analysis/        # filtering, sorting, charts, stats
+│   ├── __init__.py
+│   ├── config.py            # Settings, constants, and logging configuration
+│   ├── presentation.py      # GUI layer (Tkinter windows, dialogs, data table)
+│   ├── data/                # Data layer
+│   │   ├── __init__.py
+│   │   ├── adapters.py      # CSV and WHO API data adapters
+│   │   ├── database.py      # SQLite database initialization and connection
+│   │   ├── store.py         # DataStore class for CRUD operations
+│   │   └── utils.py         # Data utilities (type inference, column cleaning)
+│   ├── analysis/            # Analysis layer
+│   │   ├── __init__.py
+│   │   ├── charts.py        # Chart generation (line, bar)
+│   │   ├── operations.py    # Filter, sort, clean, and statistics operations
+│   │   ├── session.py       # AnalysisSession for managing operation pipelines
+│   │   └── utils.py         # Analysis utilities (date parsing, numeric detection)
+│   ├── exports/             # Directory for exported CSV and chart files
+│   └── logs/                # Application log files
 └── test/
-    ├── unit/
-    └── integration/
+    ├── __init__.py
+    ├── unit/                # Unit tests for individual components
+    ├── integration/         # Integration tests for layer interactions
+    └── system/              # End-to-end system tests
 ```
 
-The code is organized in layers:
-- **Presentation** handles the UI (Tkinter windows, dialogs, the data table)
-- **Analysis** does the actual data manipulation without touching the original
-- **Data** manages storage and retrieval from SQLite
+## Architecture
+
+The application follows a three-layer architecture:
+
+| Layer | Responsibility |
+|-------|----------------|
+| **Presentation** | Tkinter-based GUI: main window, dialogs, data table display, user interaction |
+| **Analysis** | Data manipulation: filtering, sorting, cleaning, statistics, chart generation |
+| **Data** | Persistence: SQLite storage, CSV/API adapters, CRUD operations |
 
 ## Dependencies
 
-- Python 3.10+
-- pandas
-- matplotlib  
-- requests (for WHO API)
-- Pillow (optional, lets you preview charts in the app)
+- **Python 3.10+**
+- **pandas** - Data manipulation and analysis
+- **matplotlib** - Chart generation
+- **requests** - WHO API communication
+- **Pillow** (optional) - Chart preview in the application
 
-## Running tests
+## Running Tests
 
+Run all tests:
 ```bash
 python -m pytest test/
 ```
 
+Run with verbose output:
+```bash
+python -m pytest test/ -v
+```
+
+Run specific test category:
+```bash
+python -m pytest test/unit/          # Unit tests only
+python -m pytest test/integration/   # Integration tests only
+python -m pytest test/system/        # System tests only
+```
+
 ---
 
-University of Westminster  
 Programming for Artificial Intelligence - Individual Assessment
