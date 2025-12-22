@@ -1,29 +1,17 @@
-"""
-Database Connection and Initialization Module
-==============================================
-
-This module handles SQLite database connection and table initialization.
-"""
+"""SQLite database connection and initialization."""
 
 import sqlite3
 from pathlib import Path
 
-# Import from parent package config
 try:
     from ..config import DATABASE_PATH
     DB_PATH = DATABASE_PATH
 except ImportError:
-    # Fallback for direct module execution
     DB_PATH = Path(__file__).parent.parent / "health_data.db"
 
 
 def get_connection():
-    """
-    Create and return a connection to the SQLite database.
-
-    Returns:
-        sqlite3.Connection: A connection object to the database
-    """
+    """Return SQLite connection with foreign keys enabled."""
     connection = sqlite3.connect(DB_PATH)
     connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
@@ -31,13 +19,11 @@ def get_connection():
 
 
 def init_db():
-    """
-    Initialize the database by creating required tables.
-    """
+    """Create required tables if they don't exist."""
     connection = get_connection()
     cursor = connection.cursor()
     
-    # imports table: tracks all import operations
+    # imports: tracks import operations
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS imports (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +34,7 @@ def init_db():
         )
     """)
     
-    # raw_records table: stores original data as JSON
+    # raw_records: stores original data as JSON
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS raw_records (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

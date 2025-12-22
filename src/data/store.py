@@ -1,9 +1,4 @@
-"""
-DataStore Class Module
-======================
-
-Main class for managing data storage and retrieval operations.
-"""
+"""DataStore class for data storage and retrieval operations."""
 
 import json
 import pandas as pd
@@ -13,48 +8,16 @@ from .utils import clean_column_name, infer_sql_type
 
 
 class DataStore:
-    """
-    Main class for managing data storage and retrieval operations.
-    
-    This class provides methods for:
-    - Importing data from adapters (CSV, API)
-    - Retrieving raw and structured data
-    - CRUD operations on individual records
-    - Managing imports and their associated data
-    
-    The DataStore follows the Repository pattern, providing a centralized
-    interface for all data access operations.
-    """
+    """Repository pattern class for data access: import, retrieve, CRUD operations."""
     
     def __init__(self):
-        """
-        Initialize the DataStore and ensure database tables exist.
-        """
+        """Initialize DataStore and ensure database tables exist."""
         init_db()
     
-    # -------------------------------------------------------------------------
-    # IMPORT OPERATIONS
-    # -------------------------------------------------------------------------
+    # --- IMPORT OPERATIONS ---
     
     def import_data(self, adapter):
-        """
-        Import data from an adapter into the database.
-        
-        This method performs the complete import process:
-        1. Fetch data using the adapter
-        2. Create an import record for tracking
-        3. Store raw data as JSON in raw_records table
-        4. Create a structured table with proper SQL columns
-        
-        Args:
-            adapter (DataAdapter): An adapter instance (CSVAdapter or WHOAPIAdapter)
-            
-        Returns:
-            int: The import_id of the newly created import
-            
-        Raises:
-            Exception: If the import process fails
-        """
+        """Import data from adapter. Returns import_id."""
         records = adapter.fetch()
         
         if len(records) == 0:
@@ -93,20 +56,7 @@ class DataStore:
             connection.close()
     
     def _create_structured_table(self, cursor, import_id, records):
-        """
-        Create a structured SQL table from imported records.
-        
-        This is a private helper method that:
-        1. Determines column names and types from the data
-        2. Creates a new table with appropriate schema
-        3. Inserts all records into the new table
-        4. Registers the table in data_tables registry
-        
-        Args:
-            cursor: Database cursor for executing SQL
-            import_id (int): The ID of the import
-            records (list): List of dictionaries containing the data
-        """
+        """Create SQL table from records with inferred column types."""
         table_name = "data_" + str(import_id)
         original_columns = list(records[0].keys())
         
@@ -147,18 +97,10 @@ class DataStore:
             (import_id, table_name)
         )
     
-    # -------------------------------------------------------------------------
-    # READ OPERATIONS - Listing and Retrieval
-    # -------------------------------------------------------------------------
+    # --- READ OPERATIONS ---
     
     def list_imports(self):
-        """
-        List all imports in the database.
-        
-        Returns:
-            pandas.DataFrame: A DataFrame containing import metadata
-                with columns: id, source_name, source_type, record_count, imported_at
-        """
+        """Return DataFrame of all imports with metadata."""
         connection = get_connection()
         
         query = """
@@ -173,13 +115,7 @@ class DataStore:
         return dataframe
     
     def list_data_tables(self):
-        """
-        List all structured data tables that have been created.
-        
-        Returns:
-            pandas.DataFrame: A DataFrame containing table registry information
-                with columns: id, import_id, table_name, created_at, source_name
-        """
+        """Return DataFrame of all structured data tables."""
         connection = get_connection()
         
         query = """
@@ -196,15 +132,7 @@ class DataStore:
         return dataframe
     
     def get_import_info(self, import_id):
-        """
-        Get metadata about a specific import.
-        
-        Args:
-            import_id (int): The ID of the import to look up
-            
-        Returns:
-            dict or None: Import metadata as a dictionary, or None if not found
-        """
+        """Return dict of import metadata, or None if not found."""
         connection = get_connection()
         cursor = connection.cursor()
         
@@ -218,19 +146,7 @@ class DataStore:
         return None
     
     def get_raw_data(self, import_id):
-        """
-        Retrieve raw data for an import as a pandas DataFrame.
-        
-        This reconstructs the original data structure from JSON storage,
-        allowing users to see all original columns exactly as imported.
-        
-        Args:
-            import_id (int): The ID of the import to retrieve
-            
-        Returns:
-            pandas.DataFrame: DataFrame containing all original data
-                with an additional '_record_id' column for reference
-        """
+        """Return DataFrame of raw data with _record_id column for CRUD."""
         connection = get_connection()
         cursor = connection.cursor()
         
@@ -254,21 +170,7 @@ class DataStore:
         return pd.DataFrame(records)
     
     def get_structured_data(self, import_id, where_clause=None, params=None):
-        """
-        Retrieve data from a structured table with optional filtering.
-        
-        This method queries the dynamically created SQL table (data_1, etc.)
-        which has proper columns and allows efficient SQL filtering.
-        
-        Args:
-            import_id (int): The ID of the import
-            where_clause (str, optional): SQL WHERE clause without 'WHERE' keyword
-                                         Example: "year > ? AND country_code = ?"
-            params (tuple, optional): Parameters for the WHERE clause placeholders
-            
-        Returns:
-            pandas.DataFrame: Filtered data from the structured table
-        """
+        """Return DataFrame from structured table with optional WHERE filtering."""
         connection = get_connection()
         table_name = "data_" + str(import_id)
         query = "SELECT * FROM " + table_name
@@ -286,17 +188,7 @@ class DataStore:
         return dataframe
     
     def get_table_columns(self, import_id):
-        """
-        Get the column names and types for a structured table.
-        
-        Useful for displaying available columns to users for filtering.
-        
-        Args:
-            import_id (int): The ID of the import
-            
-        Returns:
-            list: List of tuples (column_name, column_type)
-        """
+        """Return list of (column_name, column_type) tuples."""
         connection = get_connection()
         cursor = connection.cursor()
         
@@ -308,24 +200,10 @@ class DataStore:
         
         return [(col["name"], col["type"]) for col in columns]
     
-    # -------------------------------------------------------------------------
-    # CRUD OPERATIONS - Create, Update, Delete
-    # -------------------------------------------------------------------------
+    # --- CRUD OPERATIONS ---
     
     def add_record(self, import_id, data):
-        """
-        Add a new record to an existing import.
-        
-        The record is added to both the raw_records table (as JSON)
-        and the structured table (as a row with columns).
-        
-        Args:
-            import_id (int): The ID of the import to add the record to
-            data (dict): The record data as a dictionary
-            
-        Returns:
-            int: The ID of the newly created raw record
-        """
+        """Add record to raw_records and structured table. Returns record_id."""
         connection = get_connection()
         cursor = connection.cursor()
         
@@ -374,20 +252,7 @@ class DataStore:
             connection.close()
     
     def update_record(self, record_id, updated_data):
-        """
-        Update an existing record in the raw_records table.
-        
-        Note: This updates the JSON in raw_records. The structured table
-        is not automatically updated (would require additional logic to
-        match raw records to structured table rows).
-        
-        Args:
-            record_id (int): The ID of the record in raw_records table
-            updated_data (dict): The new data to store
-            
-        Returns:
-            bool: True if the record was updated, False if not found
-        """
+        """Update raw_records JSON. Returns True if updated."""
         connection = get_connection()
         cursor = connection.cursor()
         
@@ -410,17 +275,7 @@ class DataStore:
             connection.close()
     
     def delete_record(self, record_id):
-        """
-        Delete a single record from the raw_records table.
-        
-        Also updates the record count in the imports table.
-        
-        Args:
-            record_id (int): The ID of the record to delete
-            
-        Returns:
-            bool: True if the record was deleted, False if not found
-        """
+        """Delete from raw_records and update import count. Returns True if deleted."""
         connection = get_connection()
         cursor = connection.cursor()
         
@@ -453,21 +308,7 @@ class DataStore:
             connection.close()
     
     def delete_import(self, import_id):
-        """
-        Delete an entire import and all associated data.
-        
-        This removes:
-        - The import record from imports table
-        - All raw records from raw_records table
-        - The structured table (data_X)
-        - The data_tables registry entry
-        
-        Args:
-            import_id (int): The ID of the import to delete
-            
-        Returns:
-            bool: True if the import was deleted, False if not found
-        """
+        """Delete import with all raw records and structured table. Returns True if deleted."""
         connection = get_connection()
         cursor = connection.cursor()
         

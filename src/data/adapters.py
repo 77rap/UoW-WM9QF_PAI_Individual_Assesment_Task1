@@ -1,9 +1,4 @@
-"""
-Data Adapters Module
-====================
-
-Contains base adapter class and all data source adapter implementations.
-"""
+"""Data adapters for CSV files and WHO API."""
 
 import csv
 import requests
@@ -11,144 +6,64 @@ from pathlib import Path
 
 
 class DataAdapter():
-    """
-    Abstract base class defining the interface for all data source adapters.
-    
-    This follows the Adapter design pattern, allowing different data sources
-    to be used interchangeably. Any class inheriting from DataAdapter must
-    implement all methods and properties.
-    
-    The adapter pattern provides:
-    - Consistent interface for different data sources
-    - Easy extensibility (add new sources by creating new adapters)
-    - Separation of concerns (each adapter handles its own data format)
-    """
+    """Base adapter interface. Subclasses must implement fetch(), source_name, source_type."""
     
     def fetch(self):
-        """
-        Fetch data from the source and return as a list of dictionaries.
-        
-        Each dictionary represents one row/record, with keys being
-        column names and values being the data.
-        
-        Returns:
-            list: A list of dictionaries containing the fetched data
-        """
+        """Fetch data and return as list of dicts."""
         pass
     
     @property
     def source_name(self):
-        """
-        Return a human-readable name identifying this data source.
-        
-        Returns:
-            str: The name of the data source (e.g., filename or API name)
-        """
+        """Return human-readable name for this data source."""
         pass
     
     @property
     def source_type(self):
-        """
-        Return the type of data source.
-        
-        Returns:
-            str: Either 'csv' or 'api'
-        """
+        """Return source type: 'csv' or 'api'."""
         pass
 
 
-# =============================================================================
-# CSV ADAPTER
-# =============================================================================
-
 class CSVAdapter(DataAdapter):
-    """
-    Adapter for importing data from CSV files.
-    
-    This adapter can handle any CSV file structure. Column names and values
-    are preserved exactly as they appear in the source file.
-    
-    Attributes:
-        filepath (Path): Path to the CSV file to import
-    """
+    """Adapter for CSV file import."""
     
     def __init__(self, filepath):
-        """
-        Initialize the CSV adapter with a file path.
-        
-        Args:
-            filepath (str or Path): Path to the CSV file
-            
-        Raises:
-            FileNotFoundError: If the specified file does not exist
-        """
+        """Init with filepath. Raises FileNotFoundError if missing."""
         self.filepath = Path(filepath)
         
         if not self.filepath.exists():
             raise FileNotFoundError("CSV file not found: " + str(filepath))
     
     def fetch(self):
-        """
-        Read the CSV file and return data as a list of dictionaries.
-        
-        Empty strings are converted to None for consistency in data handling.
-        The csv.DictReader automatically uses the first row as headers.
-        
-        Returns:
-            list: List of dictionaries, one per row in the CSV
-        """
+        """Read CSV and return list of dicts. Empty strings become None."""
         records = []
-        
-        # utf-8-sig encoding handles BOM that Excel adds to CSV files
-        file = open(self.filepath, 'r', encoding='utf-8-sig')
+        file = open(self.filepath, 'r', encoding='utf-8-sig')  # utf-8-sig handles Excel BOM
         
         try:
             reader = csv.DictReader(file)
-            
             for row in reader:
                 cleaned_row = {k: (v if v != "" else None) for k, v in row.items()}
-                records.append(cleaned_row)
-                
+                records.append(cleaned_row)        
         finally:
-            file.close()
-        
+            file.close()      
         return records
     
     @property
     def source_name(self):
-        """Return the filename as the source name."""
+        """Return filename."""
         return self.filepath.name
     
     @property
     def source_type(self):
-        """Return 'csv' as the source type."""
+        """Return 'csv'."""
         return "csv"
 
 
-# =============================================================================
-# WHO API ADAPTER
-# =============================================================================
-
 class WHOAPIAdapter(DataAdapter):
-    """
-    Adapter for fetching data from the WHO Global Health Observatory API.
+    """Adapter for WHO Global Health Observatory API."""
     
-    The WHO GHO API provides access to various health indicators such as
-    life expectancy, mortality rates, and vaccination coverage statistics.
-    
-    API Documentation: https://www.who.int/data/gho/info/gho-odata-api
-    
-    Attributes:
-        indicator_code (str): The WHO indicator code to fetch
-        indicator_name (str): Human-readable name for the indicator
-        limit (int): Maximum number of records to fetch
-    """
-    
-    # Base URL for the WHO GHO API
     BASE_URL = "https://ghoapi.azureedge.net/api"
     
-    # Dictionary mapping friendly names to WHO indicator codes
-    # This makes it easier for users to request common indicators
+    # Map friendly names to WHO indicator codes
     INDICATORS = {
         "life_expectancy": "WHOSIS_000001",
         "infant_mortality": "MDG_0000000001",
@@ -158,14 +73,7 @@ class WHOAPIAdapter(DataAdapter):
     }
     
     def __init__(self, indicator="life_expectancy", limit=1000):
-        """
-        Initialize the WHO API adapter.
-        
-        Args:
-            indicator (str): Either a key from INDICATORS dict or a raw 
-                           WHO indicator code
-            limit (int): Maximum number of records to fetch (default 1000)
-        """
+        """Init with indicator name/code and fetch limit."""
         self.indicator_name = indicator
         
         if indicator in self.INDICATORS:
@@ -176,22 +84,9 @@ class WHOAPIAdapter(DataAdapter):
         self.limit = limit
     
     def fetch(self):
-        """
-        Fetch data from the WHO GHO API.
-        
-        The API returns JSON data which is parsed and simplified into
-        a consistent dictionary format.
-        
-        Returns:
-            list: List of dictionaries containing health indicator data
-            
-        Raises:
-            requests.RequestException: If the API request fails
-        """
+        """Fetch from WHO API and return normalized list of dicts."""
         url = self.BASE_URL + "/" + self.indicator_code
         params = {"$top": self.limit}
-        
-        # Timeout prevents hanging on slow connections
         response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         
@@ -214,10 +109,10 @@ class WHOAPIAdapter(DataAdapter):
     
     @property
     def source_name(self):
-        """Return a descriptive name for this API data source."""
+        """Return WHO_GHO_{indicator_name}."""
         return "WHO_GHO_" + self.indicator_name
     
     @property
     def source_type(self):
-        """Return 'api' as the source type."""
+        """Return 'api'."""
         return "api"

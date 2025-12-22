@@ -1,29 +1,10 @@
-"""
-Utility Functions Module
-=========================
-
-Helper functions for data processing and SQL operations.
-"""
+"""Utility functions for data processing and SQL operations."""
 
 import re
 
 
 def clean_column_name(name):
-    """
-    Convert a column name to a SQL-safe format.
-    
-    Transformations applied:
-    - Convert to lowercase
-    - Replace spaces and special characters with underscores
-    - Remove consecutive underscores
-    - Remove leading/trailing underscores
-    
-    Args:
-        name (str): The original column name
-        
-    Returns:
-        str: A cleaned, SQL-compatible column name
-    """
+    """Convert column name to SQL-safe format (lowercase, underscores, no special chars)."""
     if name is None:
         return "unnamed_column"
     
@@ -36,18 +17,7 @@ def clean_column_name(name):
 
 
 def infer_sql_type(values):
-    """
-    Infer the most appropriate SQL data type from a list of values.
-    
-    The function attempts to identify if values are integers, floats,
-    or should remain as text. This is used when creating structured tables.
-    
-    Args:
-        values (list): Sample values from a column
-        
-    Returns:
-        str: SQL type ('INTEGER', 'REAL', or 'TEXT')
-    """
+    """Infer SQL type from values: returns 'INTEGER', 'REAL', or 'TEXT'."""
     non_null_values = [v for v in values if v is not None]
     
     if len(non_null_values) == 0:

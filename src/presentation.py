@@ -288,25 +288,30 @@ class MainWindow:
     
     def _create_toolbar(self):
         """Create the toolbar with dataset selection and action buttons."""
-        toolbar = ttk.Frame(self.root, padding="5")
-        toolbar.pack(fill=tk.X, side=tk.TOP)
+        # Main toolbar container
+        toolbar_container = ttk.Frame(self.root, padding="5")
+        toolbar_container.pack(fill=tk.X, side=tk.TOP)
+        
+        # Row 1: Dataset selection and data management
+        toolbar_row1 = ttk.Frame(toolbar_container)
+        toolbar_row1.pack(fill=tk.X, pady=(0, 3))
         
         # Dataset selection
-        ttk.Label(toolbar, text="Dataset:").pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(toolbar_row1, text="Dataset:").pack(side=tk.LEFT, padx=(0, 5))
         
         self.dataset_var = tk.StringVar()
         self.dataset_dropdown = ttk.Combobox(
-            toolbar,
+            toolbar_row1,
             textvariable=self.dataset_var,
             state="readonly",
-            width=40
+            width=35
         )
         self.dataset_dropdown.pack(side=tk.LEFT, padx=(0, 10))
         self.dataset_dropdown.bind("<<ComboboxSelected>>", self._on_dataset_selected)
         
         # Import CSV button
         self.import_btn = ttk.Button(
-            toolbar,
+            toolbar_row1,
             text="Import CSV",
             command=self._on_import_click
         )
@@ -314,7 +319,7 @@ class MainWindow:
         
         # Import WHO API button
         self.import_api_btn = ttk.Button(
-            toolbar,
+            toolbar_row1,
             text="Import WHO API",
             command=self._on_import_api_click
         )
@@ -322,7 +327,7 @@ class MainWindow:
         
         # Export button
         self.export_btn = ttk.Button(
-            toolbar,
+            toolbar_row1,
             text="Export CSV",
             command=self._on_export_click
         )
@@ -330,18 +335,18 @@ class MainWindow:
         
         # Delete dataset button
         self.delete_btn = ttk.Button(
-            toolbar,
+            toolbar_row1,
             text="Delete Dataset",
             command=self._on_delete_click
         )
         self.delete_btn.pack(side=tk.LEFT, padx=2)
         
         # Separator
-        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        ttk.Separator(toolbar_row1, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
         
         # Summary button
         self.summary_btn = ttk.Button(
-            toolbar,
+            toolbar_row1,
             text="Summary",
             command=self._on_summary_click
         )
@@ -349,18 +354,49 @@ class MainWindow:
         
         # Graph button
         self.graph_btn = ttk.Button(
-            toolbar,
+            toolbar_row1,
             text="Graph",
             command=self._on_graph_click
         )
         self.graph_btn.pack(side=tk.LEFT, padx=2)
         
+        # Row 2: Record management and tools
+        toolbar_row2 = ttk.Frame(toolbar_container)
+        toolbar_row2.pack(fill=tk.X)
+        
+        # Record management label
+        ttk.Label(toolbar_row2, text="Records:").pack(side=tk.LEFT, padx=(0, 5))
+        
+        # Add Record button
+        self.add_record_btn = ttk.Button(
+            toolbar_row2,
+            text="Add",
+            command=self._on_add_record_click
+        )
+        self.add_record_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Edit Record button
+        self.edit_record_btn = ttk.Button(
+            toolbar_row2,
+            text="Edit",
+            command=self._on_edit_record_click
+        )
+        self.edit_record_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Delete Record button
+        self.delete_record_btn = ttk.Button(
+            toolbar_row2,
+            text="Delete",
+            command=self._on_delete_record_click
+        )
+        self.delete_record_btn.pack(side=tk.LEFT, padx=2)
+        
         # Separator before log button
-        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        ttk.Separator(toolbar_row2, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
         
         # View Log button
         self.log_btn = ttk.Button(
-            toolbar,
+            toolbar_row2,
             text="View Log",
             command=self._on_view_log_click
         )
@@ -465,6 +501,14 @@ class MainWindow:
             command=self._on_clear_sort_click
         )
         self.clear_sort_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Clear All button (clears all operations at once)
+        self.clear_all_btn = ttk.Button(
+            btn_frame,
+            text="Clear All Ops",
+            command=self._on_clear_all_operations_click
+        )
+        self.clear_all_btn.pack(side=tk.LEFT, padx=(10, 2))
     
     def _create_status_bar(self):
         """Create the status bar showing current state."""
@@ -1026,6 +1070,110 @@ class MainWindow:
             self.logger.error("Failed to open log file: " + str(e))
     
     # -------------------------------------------------------------------------
+    # EVENT HANDLERS - Record CRUD Operations
+    # -------------------------------------------------------------------------
+    
+    def _on_add_record_click(self):
+        """Handle Add Record button click."""
+        if self.current_import_id is None:
+            messagebox.showwarning("No Dataset", "Please select a dataset first.")
+            return
+        
+        # Open add record dialog
+        AddRecordDialog(self.root, self.data_store, self.current_import_id, 
+                        self.session.get_columns(), self._on_record_changed)
+    
+    def _on_edit_record_click(self):
+        """Handle Edit Record button click."""
+        if self.current_import_id is None:
+            messagebox.showwarning("No Dataset", "Please select a dataset first.")
+            return
+        
+        # Get selected row from treeview
+        selection = self.tree.selection()
+        if not selection:
+            messagebox.showinfo("No Selection", "Please select a row to edit.")
+            return
+        
+        # Get the row number from the first column (index 0)
+        row_values = self.tree.item(selection[0], "values")
+        if not row_values:
+            return
+        
+        row_number = int(row_values[0])  # First column is row #
+        
+        # Get the record_id from raw data
+        raw_df = self.data_store.get_raw_data(self.current_import_id)
+        if row_number > len(raw_df):
+            messagebox.showerror("Error", "Row not found.")
+            return
+        
+        record_id = int(raw_df.iloc[row_number - 1]["_record_id"])
+        record_data = {col: raw_df.iloc[row_number - 1][col] 
+                       for col in raw_df.columns if not col.startswith("_")}
+        
+        # Open edit record dialog
+        EditRecordDialog(self.root, self.data_store, record_id, record_data, 
+                         self._on_record_changed)
+    
+    def _on_delete_record_click(self):
+        """Handle Delete Record button click."""
+        if self.current_import_id is None:
+            messagebox.showwarning("No Dataset", "Please select a dataset first.")
+            return
+        
+        # Get selected row from treeview
+        selection = self.tree.selection()
+        if not selection:
+            messagebox.showinfo("No Selection", "Please select a row to delete.")
+            return
+        
+        # Get the row number from the first column
+        row_values = self.tree.item(selection[0], "values")
+        if not row_values:
+            return
+        
+        row_number = int(row_values[0])
+        
+        # Confirm deletion
+        result = messagebox.askyesno(
+            "Confirm Delete",
+            "Are you sure you want to delete row #" + str(row_number) + "?\n\n" +
+            "This action cannot be undone.",
+            icon="warning"
+        )
+        
+        if not result:
+            return
+        
+        # Get the record_id from raw data
+        raw_df = self.data_store.get_raw_data(self.current_import_id)
+        if row_number > len(raw_df):
+            messagebox.showerror("Error", "Row not found.")
+            return
+        
+        record_id = int(raw_df.iloc[row_number - 1]["_record_id"])
+        
+        try:
+            success = self.data_store.delete_record(record_id)
+            if success:
+                self.logger.info("Deleted record ID: " + str(record_id))
+                self._on_record_changed()
+                messagebox.showinfo("Success", "Record deleted successfully.")
+            else:
+                messagebox.showerror("Error", "Record not found.")
+        except Exception as e:
+            self.logger.error("Delete record failed: " + str(e))
+            messagebox.showerror("Error", "Failed to delete record: " + str(e))
+    
+    def _on_record_changed(self):
+        """Callback when a record is added, edited, or deleted."""
+        # Reload the dataset to reflect changes
+        self._load_dataset(self.current_import_id)
+        # Refresh the dataset list to update record counts
+        self._refresh_dataset_list()
+    
+    # -------------------------------------------------------------------------
     # EVENT HANDLERS - Operations
     # -------------------------------------------------------------------------
     
@@ -1099,6 +1247,32 @@ class MainWindow:
         
         self.session.clear_sort()
         self.logger.info("Cleared sort operation")
+        self._on_operation_added()
+    
+    def _on_clear_all_operations_click(self):
+        """Handle Clear All Operations button click."""
+        if self.session is None:
+            return
+        
+        # Check if there are any operations to clear
+        ops = self.session.list_all_operations()
+        if not ops["clean"] and not ops["filter"] and not ops["sort"]:
+            messagebox.showinfo("No Operations", "There are no operations to clear.")
+            return
+        
+        # Confirm clearing all
+        result = messagebox.askyesno(
+            "Clear All Operations",
+            "This will remove all clean, filter, and sort operations.\n\n" +
+            "Are you sure you want to continue?",
+            icon="question"
+        )
+        
+        if not result:
+            return
+        
+        self.session.clear_all_operations()
+        self.logger.info("Cleared all operations")
         self._on_operation_added()
     
     def _on_operation_added(self):
@@ -2237,6 +2411,192 @@ class GraphPopup:
             
         except Exception as e:
             messagebox.showerror("Export Error", str(e))
+
+
+# =============================================================================
+# CRUD DIALOGS - Add and Edit Records
+# =============================================================================
+
+class AddRecordDialog:
+    """Dialog for adding a new record to a dataset."""
+    
+    def __init__(self, parent, data_store, import_id, columns, callback):
+        """
+        Initialize the add record dialog.
+        
+        Args:
+            parent: Parent window
+            data_store: DataStore instance
+            import_id: ID of the import to add record to
+            columns: List of column names
+            callback: Function to call after successful add
+        """
+        self.data_store = data_store
+        self.import_id = import_id
+        self.columns = columns
+        self.callback = callback
+        self.entries = {}
+        
+        # Create dialog window
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Add Record")
+        self.dialog.geometry("500x400")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        self._create_widgets()
+        
+        # Center on parent
+        self.dialog.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width() - self.dialog.winfo_width()) // 2
+        y = parent.winfo_rooty() + (parent.winfo_height() - self.dialog.winfo_height()) // 2
+        self.dialog.geometry("+{}+{}".format(x, y))
+    
+    def _create_widgets(self):
+        """Create the dialog widgets."""
+        # Scrollable frame for fields
+        canvas = tk.Canvas(self.dialog)
+        scrollbar = ttk.Scrollbar(self.dialog, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Create entry field for each column
+        for i, col in enumerate(self.columns):
+            ttk.Label(scrollable_frame, text=col + ":").grid(
+                row=i, column=0, sticky="e", padx=5, pady=3
+            )
+            entry = ttk.Entry(scrollable_frame, width=40)
+            entry.grid(row=i, column=1, sticky="ew", padx=5, pady=3)
+            self.entries[col] = entry
+        
+        scrollable_frame.columnconfigure(1, weight=1)
+        
+        canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Buttons
+        btn_frame = ttk.Frame(self.dialog)
+        btn_frame.pack(fill=tk.X, padx=5, pady=10)
+        
+        ttk.Button(btn_frame, text="Add Record", command=self._on_add).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=self.dialog.destroy).pack(side=tk.RIGHT)
+    
+    def _on_add(self):
+        """Handle Add button click."""
+        # Collect data from entries
+        data = {}
+        for col, entry in self.entries.items():
+            value = entry.get().strip()
+            data[col] = value if value else None
+        
+        try:
+            record_id = self.data_store.add_record(self.import_id, data)
+            self.dialog.destroy()
+            self.callback()
+            messagebox.showinfo("Success", "Record added successfully (ID: " + str(record_id) + ")")
+        except Exception as e:
+            messagebox.showerror("Error", "Failed to add record: " + str(e))
+
+
+class EditRecordDialog:
+    """Dialog for editing an existing record."""
+    
+    def __init__(self, parent, data_store, record_id, record_data, callback):
+        """
+        Initialize the edit record dialog.
+        
+        Args:
+            parent: Parent window
+            data_store: DataStore instance
+            record_id: ID of the record to edit
+            record_data: Current record data as dictionary
+            callback: Function to call after successful edit
+        """
+        self.data_store = data_store
+        self.record_id = record_id
+        self.record_data = record_data
+        self.callback = callback
+        self.entries = {}
+        
+        # Create dialog window
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Edit Record (ID: " + str(record_id) + ")")
+        self.dialog.geometry("500x400")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        self._create_widgets()
+        
+        # Center on parent
+        self.dialog.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width() - self.dialog.winfo_width()) // 2
+        y = parent.winfo_rooty() + (parent.winfo_height() - self.dialog.winfo_height()) // 2
+        self.dialog.geometry("+{}+{}".format(x, y))
+    
+    def _create_widgets(self):
+        """Create the dialog widgets."""
+        # Scrollable frame for fields
+        canvas = tk.Canvas(self.dialog)
+        scrollbar = ttk.Scrollbar(self.dialog, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Create entry field for each column with current values
+        for i, (col, value) in enumerate(self.record_data.items()):
+            ttk.Label(scrollable_frame, text=col + ":").grid(
+                row=i, column=0, sticky="e", padx=5, pady=3
+            )
+            entry = ttk.Entry(scrollable_frame, width=40)
+            entry.grid(row=i, column=1, sticky="ew", padx=5, pady=3)
+            # Pre-fill with current value
+            if value is not None:
+                entry.insert(0, str(value))
+            self.entries[col] = entry
+        
+        scrollable_frame.columnconfigure(1, weight=1)
+        
+        canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5, pady=5)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Buttons
+        btn_frame = ttk.Frame(self.dialog)
+        btn_frame.pack(fill=tk.X, padx=5, pady=10)
+        
+        ttk.Button(btn_frame, text="Save Changes", command=self._on_save).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=self.dialog.destroy).pack(side=tk.RIGHT)
+    
+    def _on_save(self):
+        """Handle Save button click."""
+        # Collect updated data from entries
+        updated_data = {}
+        for col, entry in self.entries.items():
+            value = entry.get().strip()
+            updated_data[col] = value if value else None
+        
+        try:
+            success = self.data_store.update_record(self.record_id, updated_data)
+            if success:
+                self.dialog.destroy()
+                self.callback()
+                messagebox.showinfo("Success", "Record updated successfully.")
+            else:
+                messagebox.showerror("Error", "Record not found.")
+        except Exception as e:
+            messagebox.showerror("Error", "Failed to update record: " + str(e))
 
 
 # =============================================================================

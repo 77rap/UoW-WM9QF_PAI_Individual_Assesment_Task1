@@ -1,18 +1,5 @@
-"""
-Analysis Session for Data Analysis
-====================================
-
-This module provides the AnalysisSession class which manages non-destructive
-data transformations including cleaning, filtering, and sorting.
-
-The core principle is NON-DESTRUCTIVE EDITING: the original data is never
-modified. Instead, operations are stored and applied on-demand to produce views.
-
-Operations are applied in a fixed sequence:
-1. Clean operations (data quality first)
-2. Filter operations (narrow to area of interest)
-3. Sort operation (affects display order only)
-"""
+"""Analysis session for non-destructive data transformations (clean, filter, sort).
+Operations applied in sequence: clean -> filter -> sort. Original data never modified."""
 
 import pandas as pd
 
@@ -28,27 +15,10 @@ from . import charts
 
 
 class AnalysisSession:
-    """
-    Main class for managing data analysis operations.
-    
-    The session maintains:
-    - A reference to the original (immutable) data
-    - Lists of active operations (clean, filter)
-    - The current sort operation (if any)
-    - The most recently generated chart (for export)
-    
-    Operations are applied in sequence: clean -> filter -> sort
-    The original data is never modified.
-    """
+    """Manages data analysis with immutable original data and stackable operations."""
     
     def __init__(self, dataframe, source_name="Unknown"):
-        """
-        Initialize an analysis session with data.
-        
-        Args:
-            dataframe (pd.DataFrame): The data to analyse
-            source_name (str): Name of the data source (for display)
-        """
+        """Initialize session with data. Args: dataframe, source_name."""
         self._original_data = dataframe.copy()
         self.source_name = source_name
         self._clean_operations = []
@@ -57,23 +27,11 @@ class AnalysisSession:
         self._current_figure = None
     
     def get_original_data(self):
-        """
-        Get the original, unmodified data.
-        
-        Returns:
-            pd.DataFrame: Copy of the original data
-        """
+        """Return copy of original unmodified data."""
         return self._original_data.copy()
     
     def get_current_view(self):
-        """
-        Get the current view with all operations applied.
-        
-        Operations are applied in order: clean -> filter -> sort
-        
-        Returns:
-            pd.DataFrame: The transformed data
-        """
+        """Return data with all operations applied (clean -> filter -> sort)."""
         data = self._original_data.copy()
         
         for clean_op in self._clean_operations:
@@ -88,58 +46,25 @@ class AnalysisSession:
         return data
     
     def get_columns(self):
-        """
-        Get list of column names in the data.
-        
-        Returns:
-            list: Column names
-        """
+        """Return list of column names."""
         return list(self._original_data.columns)
     
     def get_column_type(self, column):
-        """
-        Get the detected type of a column.
-        
-        Args:
-            column (str): Column name
-            
-        Returns:
-            str: 'text', 'numeric', or 'date'
-        """
+        """Return detected type of column: 'text', 'numeric', or 'date'."""
         if column not in self._original_data.columns:
             raise ValueError("Column not found: " + column)
-        
         return detect_column_type(self._original_data[column])
     
     def get_row_count(self):
-        """
-        Get the number of rows in the current view.
-        
-        Returns:
-            int: Number of rows after all operations applied
-        """
+        """Return row count after all operations applied."""
         return len(self.get_current_view())
     
     def get_original_row_count(self):
-        """
-        Get the number of rows in the original data.
-        
-        Returns:
-            int: Original number of rows
-        """
+        """Return original row count before operations."""
         return len(self._original_data)
 
     def add_clean(self, columns, missing_values=None):
-        """
-        Add a clean operation to remove rows with missing values.
-        
-        Args:
-            columns (list): Column names to check for missing values
-            missing_values (list, optional): Additional values to treat as missing
-            
-        Returns:
-            int: The operation ID of the new clean operation
-        """
+        """Add clean operation. Returns operation_id."""
         for col in columns:
             if col not in self._original_data.columns:
                 raise ValueError("Column not found: " + col)
@@ -150,15 +75,7 @@ class AnalysisSession:
         return operation.operation_id
     
     def remove_clean(self, operation_id):
-        """
-        Remove a clean operation by its ID.
-        
-        Args:
-            operation_id (int): The ID of the operation to remove
-            
-        Returns:
-            bool: True if removed, False if not found
-        """
+        """Remove clean operation by ID. Returns True if removed."""
         for i in range(len(self._clean_operations)):
             if self._clean_operations[i].operation_id == operation_id:
                 self._clean_operations.pop(i)
@@ -166,31 +83,14 @@ class AnalysisSession:
         return False
     
     def list_clean_operations(self):
-        """
-        List all active clean operations.
-        
-        Returns:
-            list: List of tuples (operation_id, description)
-        """
+        """Return list of (operation_id, description) tuples."""
         result = []
         for op in self._clean_operations:
             result.append((op.operation_id, op.describe()))
         return result
     
     def _apply_clean(self, data, clean_op):
-        """
-        Apply a clean operation to data.
-        
-        Removes rows where ANY of the specified columns contains
-        a missing or invalid value.
-        
-        Args:
-            data (pd.DataFrame): Data to clean
-            clean_op (CleanOperation): The operation to apply
-            
-        Returns:
-            pd.DataFrame: Cleaned data
-        """
+        """Apply clean operation - removes rows with missing values in specified columns."""
         if len(data) == 0:
             return data
         
@@ -212,17 +112,7 @@ class AnalysisSession:
         return data[keep_mask]
 
     def get_filter_options(self, column):
-        """
-        Get filter options for a column based on its type.
-        
-        This method helps the UI determine what filter interface to show.
-        
-        Args:
-            column (str): Column name to get options for
-            
-        Returns:
-            dict: Filter information including type and available options
-        """
+        """Return filter options dict with type, values/range based on column type."""
         if column not in self._original_data.columns:
             raise ValueError("Column not found: " + column)
         
@@ -270,32 +160,12 @@ class AnalysisSession:
         return {"column": column, "type": "unknown"}
     
     def search_filter_values(self, column, search_term):
-        """
-        Search for filter values in a text column.
-        
-        Used when there are too many unique values to display all.
-        
-        Args:
-            column (str): Column name
-            search_term (str): Text to search for
-            
-        Returns:
-            list: Matching values
-        """
+        """Search for matching values in a text column."""
         current_data = self.get_current_view()
         return search_values(current_data[column], search_term)
     
     def add_filter_text(self, column, values):
-        """
-        Add a text filter to include only rows with specified values.
-        
-        Args:
-            column (str): Column name to filter
-            values (list): List of values to include
-            
-        Returns:
-            int: The operation ID of the new filter
-        """
+        """Add text filter for specified values. Returns operation_id."""
         if column not in self._original_data.columns:
             raise ValueError("Column not found: " + column)
         
@@ -308,20 +178,7 @@ class AnalysisSession:
         return operation.operation_id
     
     def add_filter_numeric(self, column, min_value, max_value):
-        """
-        Add a numeric range filter.
-        
-        Args:
-            column (str): Column name to filter
-            min_value: Minimum value (inclusive)
-            max_value: Maximum value (inclusive)
-            
-        Returns:
-            int: The operation ID of the new filter
-            
-        Raises:
-            ValueError: If column not found, min > max, or values out of data range
-        """
+        """Add numeric range filter (inclusive). Returns operation_id. Raises ValueError if invalid."""
         if column not in self._original_data.columns:
             raise ValueError("Column not found: " + column)
         
@@ -352,20 +209,7 @@ class AnalysisSession:
         return operation.operation_id
     
     def add_filter_date(self, column, start_date, end_date):
-        """
-        Add a date range filter.
-        
-        Args:
-            column (str): Column name to filter
-            start_date: Start date (inclusive)
-            end_date: End date (inclusive)
-            
-        Returns:
-            int: The operation ID of the new filter
-            
-        Raises:
-            ValueError: If column not found, start > end, or dates out of data range
-        """
+        """Add date range filter (inclusive). Returns operation_id. Raises ValueError if invalid."""
         if column not in self._original_data.columns:
             raise ValueError("Column not found: " + column)
         
@@ -401,15 +245,7 @@ class AnalysisSession:
         return operation.operation_id
     
     def remove_filter(self, operation_id):
-        """
-        Remove a filter operation by its ID.
-        
-        Args:
-            operation_id (int): The ID of the filter to remove
-            
-        Returns:
-            bool: True if removed, False if not found
-        """
+        """Remove filter operation by ID. Returns True if removed."""
         for i in range(len(self._filter_operations)):
             if self._filter_operations[i].operation_id == operation_id:
                 self._filter_operations.pop(i)
@@ -417,28 +253,14 @@ class AnalysisSession:
         return False
     
     def list_filter_operations(self):
-        """
-        List all active filter operations.
-        
-        Returns:
-            list: List of tuples (operation_id, description)
-        """
+        """Return list of (operation_id, description) tuples."""
         result = []
         for op in self._filter_operations:
             result.append((op.operation_id, op.describe()))
         return result
     
     def _apply_filter(self, data, filter_op):
-        """
-        Apply a filter operation to data.
-        
-        Args:
-            data (pd.DataFrame): Data to filter
-            filter_op (FilterOperation): The operation to apply
-            
-        Returns:
-            pd.DataFrame: Filtered data
-        """
+        """Apply filter operation based on filter type (text/numeric/date)."""
         if len(data) == 0:
             return data
         
@@ -464,46 +286,23 @@ class AnalysisSession:
         return data
 
     def set_sort(self, column, ascending=True):
-        """
-        Set the sort operation (replaces any existing sort).
-        
-        Args:
-            column (str): Column name to sort by
-            ascending (bool): True for ascending, False for descending
-        """
+        """Set sort operation (replaces any existing). Args: column, ascending."""
         if column not in self._original_data.columns:
             raise ValueError("Column not found: " + column)
-        
         self._sort_operation = SortOperation(column, ascending)
     
     def clear_sort(self):
-        """Clear the current sort operation."""
+        """Clear current sort operation."""
         self._sort_operation = None
     
     def get_sort_operation(self):
-        """
-        Get the current sort operation.
-        
-        Returns:
-            tuple or None: (column, ascending) or None if no sort active
-        """
+        """Return (column, ascending) tuple or None."""
         if self._sort_operation is None:
             return None
         return (self._sort_operation.column, self._sort_operation.ascending)
     
     def _apply_sort(self, data, sort_op):
-        """
-        Apply a sort operation to data.
-        
-        Null values are placed at the BEGINNING regardless of sort direction.
-        
-        Args:
-            data (pd.DataFrame): Data to sort
-            sort_op (SortOperation): The operation to apply
-            
-        Returns:
-            pd.DataFrame: Sorted data
-        """
+        """Apply sort operation. Null values placed at beginning."""
         if len(data) == 0:
             return data
         
@@ -537,49 +336,28 @@ class AnalysisSession:
         return result
 
     def list_all_operations(self):
-        """
-        List all active operations.
-        
-        Returns:
-            dict: Dictionary with 'clean', 'filter', and 'sort' keys
-        """
+        """Return dict with 'clean', 'filter', 'sort' keys."""
         result = {
             "clean": self.list_clean_operations(),
             "filter": self.list_filter_operations(),
             "sort": None
         }
-        
         if self._sort_operation is not None:
             result["sort"] = self._sort_operation.describe()
-        
         return result
     
     def clear_all_operations(self):
-        """Remove all operations and return to original data."""
+        """Remove all operations, revert to original data."""
         self._clean_operations = []
         self._filter_operations = []
         self._sort_operation = None
     
     def has_empty_result(self):
-        """
-        Check if current operations produce empty results.
-        
-        Returns:
-            bool: True if current view has no rows
-        """
+        """Return True if current view has no rows."""
         return len(self.get_current_view()) == 0
 
     def get_summary(self, column, group_by=None):
-        """
-        Calculate summary statistics for a column (numeric or text).
-        
-        Args:
-            column (str): Column to summarise
-            group_by (str, optional): Column to group results by
-            
-        Returns:
-            dict or pd.DataFrame: Summary statistics
-        """
+        """Calculate summary stats for column. Returns dict or DataFrame if grouped."""
         data = self.get_current_view()
         
         if len(data) == 0:
@@ -617,18 +395,8 @@ class AnalysisSession:
             return pd.DataFrame(grouped_results)
     
     def _calculate_numeric_stats(self, numeric_series, column_name):
-        """
-        Calculate statistics for a numeric series.
-        
-        Args:
-            numeric_series (pd.Series): Numeric data
-            column_name (str): Name of the column (for display)
-            
-        Returns:
-            dict: Statistics dictionary
-        """
+        """Return dict with count, missing, min, max, mean, median, std."""
         non_null = numeric_series.dropna()
-        
         stats = {
             "column": column_name,
             "count": len(non_null),
@@ -639,33 +407,16 @@ class AnalysisSession:
             "median": non_null.median() if len(non_null) > 0 else None,
             "std": non_null.std() if len(non_null) > 1 else None
         }
-        
         return stats
     
     def _calculate_text_stats(self, text_series, column_name):
-        """
-        Calculate statistics for a text/categorical series.
-        
-        Args:
-            text_series (pd.Series): Text data
-            column_name (str): Name of the column (for display)
-            
-        Returns:
-            dict: Statistics dictionary with text-specific metrics
-        """
+        """Return dict with count, missing, unique_count, mode, top values."""
         non_null = text_series.dropna()
-        
-        # Get value counts
         value_counts = non_null.value_counts()
-        
-        # Mode (most frequent value)
         mode_value = value_counts.index[0] if len(value_counts) > 0 else None
         mode_frequency = value_counts.iloc[0] if len(value_counts) > 0 else 0
-        
-        # Least frequent value
         least_frequent_value = value_counts.index[-1] if len(value_counts) > 0 else None
         least_frequency = value_counts.iloc[-1] if len(value_counts) > 0 else 0
-        
         stats = {
             "column": column_name,
             "count": len(non_null),
@@ -687,12 +438,7 @@ class AnalysisSession:
         return stats
     
     def get_numeric_columns(self):
-        """
-        Get list of numeric columns (for summary/graphing).
-        
-        Returns:
-            list: Names of numeric columns
-        """
+        """Return list of numeric column names."""
         result = []
         for col in self._original_data.columns:
             if detect_column_type(self._original_data[col]) == "numeric":
@@ -700,12 +446,7 @@ class AnalysisSession:
         return result
     
     def get_text_columns(self):
-        """
-        Get list of text/categorical columns.
-        
-        Returns:
-            list: Names of text columns
-        """
+        """Return list of text/categorical column names."""
         result = []
         for col in self._original_data.columns:
             if detect_column_type(self._original_data[col]) == "text":
@@ -713,19 +454,7 @@ class AnalysisSession:
         return result
 
     def generate_chart(self, x_column, y_column, group_by=None, aggregation="sum", show=True):
-        """
-        Generate a chart from the current view.
-        
-        Args:
-            x_column (str): Column for x-axis
-            y_column (str): Column for y-axis (must be numeric)
-            group_by (str, optional): Column to create multiple series
-            aggregation (str): How to aggregate y values - 'sum', 'mean', or 'count'
-            show (bool): Whether to display the chart immediately
-            
-        Returns:
-            matplotlib.figure.Figure: The generated chart figure
-        """
+        """Generate chart from current view. Returns matplotlib Figure."""
         data = self.get_current_view()
         self._current_figure = charts.generate_chart(
             data, x_column, y_column, group_by, aggregation, show
@@ -733,18 +462,7 @@ class AnalysisSession:
         return self._current_figure
     
     def generate_multi_line_chart(self, x_column, y_columns, aggregation="sum", show=True):
-        """
-        Generate a multi-line chart with multiple Y columns.
-        
-        Args:
-            x_column (str): Column for x-axis
-            y_columns (list): List of column names for y-axis (all must be numeric)
-            aggregation (str): How to aggregate y values - 'sum', 'mean', or 'count'
-            show (bool): Whether to display the chart immediately
-            
-        Returns:
-            matplotlib.figure.Figure: The generated chart figure
-        """
+        """Generate multi-line chart with multiple Y columns. Returns matplotlib Figure."""
         data = self.get_current_view()
         self._current_figure = charts.generate_multi_line_chart(
             data, x_column, y_columns, aggregation, show
@@ -752,13 +470,5 @@ class AnalysisSession:
         return self._current_figure
     
     def export_chart(self, filepath):
-        """
-        Export the most recently generated chart to a file.
-        
-        Args:
-            filepath (str): Path to save the chart (e.g., 'chart.png')
-            
-        Returns:
-            bool: True if exported successfully
-        """
+        """Export most recent chart to file. Returns True on success."""
         return charts.export_chart(self._current_figure, filepath)
